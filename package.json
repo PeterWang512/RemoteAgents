@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "@cloudcli-ai/cloudcli": "^1.37.9"
+  }
+}

@@ -1,0 +1,18 @@
+# Append to ~/.ssh/config on your laptop (macOS/Linux).
+# Needs a Kerberos ticket first:  kinit <you>@CSAIL.MIT.EDU
+# Duo 2FA is asked once at the jump host; ControlMaster reuses that login.
+
+Host jump.csail.mit.edu
+    User <you>
+    GSSAPIAuthentication yes
+    GSSAPIDelegateCredentials yes
+    ControlMaster auto
+    ControlPersist 10h
+    ControlPath ~/.ssh/cm_socket/%C      # mkdir -p ~/.ssh/cm_socket
+
+Host torralba-3090-4
+    HostName torralba-3090-4.csail.mit.edu
+    User <you>
+    ProxyJump jump.csail.mit.edu
+    GSSAPIAuthentication yes
+    GSSAPIDelegateCredentials yes

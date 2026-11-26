@@ -24,7 +24,7 @@ torralba-3090-4 ── /tmp/cloudcli-<you>/sock   (dir 0700, socket 0600)
                             └── mic audio ──> Whisper STT, 127.0.0.1:8765 (API key)
 
 optional public path:
-phone ──https──> tunnel ──> /tmp/cloudcli-<you>/gate.sock ── device gate ──> sock
+phone ──https:8443 (self-signed)──> device gate ──> sock
 ```
 
 ## Security model
@@ -34,7 +34,7 @@ You pass three checks to reach the UI:
 1. **SSH login**: Duo at the jump host, Kerberos for your own account.
 2. **Unix socket permissions**: CloudCLI does not listen on any TCP port. A port on `127.0.0.1` would be
    reachable by *every* user on a shared host. `unix-listen.cjs` moves it to a socket only your user can open.
-3. **Device gate** (public path only): unknown browsers get a code and nothing else until you run
+3. **Device gate** (public HTTPS path only): unknown browsers get a code and nothing else until you run
    `./devices approve <CODE>` on the CSAIL host. Only cookie hashes are stored (`~/.cloudcli/devices.json`).
 4. **CloudCLI login**: single user account, bcrypt-hashed password, 7-day signed session tokens.
    Data lives in `~/.cloudcli/` (on AFS, other users get lookup-only, no read).
@@ -127,18 +127,18 @@ HTTPS path, but not on plain `http://<some-ip>`. Text-to-speech is not set up.
 
 ## Public access (optional)
 
-> **Policy caveat.** A tunnel started *from* the CSAIL host bypasses the jump host and Duo, which is
-> the reason TIG bans `code tunnel`. Doing this is your call; expect TIG to object, and stop if they do.
+Set `PUBLIC_PORT=8443` in `local.env` and run `./up.sh`. The **gate** (never CloudCLI itself) then also
+listens on `https://0.0.0.0:8443` with a self-signed certificate (created once in `~/.cloudcli/tls/`,
+fingerprint printed in the `gate` tmux window). Only HTTPS is offered: plain HTTP would leak your
+password and session cookie, and browsers block the mic without HTTPS.
 
-Point the tunnel at the **gate** socket, never at `sock`, e.g. with a Cloudflare quick tunnel
-(not yet tested here):
+First time on a new device:
+1. Open `https://<host>.csail.mit.edu:8443`. Accept the certificate warning *after* checking that the
+   fingerprint matches the one in the `gate` window.
+2. The page shows a code. On the CSAIL host: `./devices approve <CODE> phone`.
+3. The page refreshes into CloudCLI; log in with your password.
 
-```bash
-cloudflared tunnel --url unix:/tmp/cloudcli-$USER/gate.sock
-```
-
-Open the printed `https://...trycloudflare.com` URL on the phone, read the code it shows, approve it
-on the CSAIL host with `./devices approve <CODE> phone`, then log in with your CloudCLI password.
+Whether this is reachable from off campus depends on CSAIL's network, not on this repo.
 
 ## Phone (without public access)
 

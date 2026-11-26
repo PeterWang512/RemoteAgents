@@ -16,6 +16,7 @@
 // Only stores sha256(cookie), so a leaked devices file can't be replayed.
 'use strict';
 const http = require('http');
+const https = require('https');
 const net = require('net');
 const fs = require('fs');
 const path = require('path');
@@ -121,7 +122,7 @@ function serve() {
 <pre style="font-size:1.3em;background:#eee;padding:.6em;border-radius:6px">./devices approve ${code} &lt;name&gt;</pre>
 <p>This page refreshes by itself.</p></body>`;
 
-  const server = http.createServer((req, res) => {
+  const handler = (req, res) => {
     let token = cookieOf(req);
     if (approved(token)) {
       const up = http.request({ socketPath: UPSTREAM, path: req.url, method: req.method, headers: req.headers }, (ur) => {
@@ -140,9 +141,9 @@ function serve() {
       'Set-Cookie': `${COOKIE}=${token}; Max-Age=31536000; Path=/; HttpOnly; Secure; SameSite=Lax`,
     });
     res.end(pendingPage(code));
-  });
+  };
 
-  server.on('upgrade', (req, sock, head) => {
+  const onUpgrade = (req, sock, head) => {
     if (!approved(cookieOf(req))) { sock.end('HTTP/1.1 403 Forbidden\r\n\r\n'); return; }
     const up = net.connect(UPSTREAM, () => {
       let raw = `${req.method} ${req.url} HTTP/1.1\r\n`;
@@ -153,13 +154,28 @@ function serve() {
     });
     const kill = () => { sock.destroy(); up.destroy(); };
     up.on('error', kill); sock.on('error', kill);
-  });
+  };
 
+  const server = http.createServer(handler);
+  server.on('upgrade', onUpgrade);
   try { fs.unlinkSync(GATE_SOCK); } catch {}
   server.listen(GATE_SOCK, () => {
     fs.chmodSync(GATE_SOCK, 0o600);
     console.log(`gate: ${GATE_SOCK} -> ${UPSTREAM}  (devices: ${DEVICES_FILE})`);
   });
+
+  // Optional public HTTPS listener (PUBLIC_PORT). Plain HTTP is never offered publicly:
+  // it would leak the password/cookies and browsers block the mic without HTTPS.
+  const PUBLIC_PORT = Number(process.env.PUBLIC_PORT || 0);
+  if (PUBLIC_PORT) {
+    const tls = { key: fs.readFileSync(process.env.TLS_KEY), cert: fs.readFileSync(process.env.TLS_CERT) };
+    const pub = https.createServer(tls, handler);
+    pub.on('upgrade', onUpgrade);
+    pub.headersTimeout = 20000;
+    pub.requestTimeout = 0; // long-lived streams/websockets
+    const host = process.env.PUBLIC_HOST || '0.0.0.0';
+    pub.listen(PUBLIC_PORT, host, () => console.log(`gate: https://${host}:${PUBLIC_PORT} -> ${UPSTREAM}`));
+  }
 }
 
 if (process.argv[2] === 'serve') serve();

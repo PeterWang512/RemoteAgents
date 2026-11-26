@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Manage devices allowed through the gate:  ./devices [list | approve <CODE> [name] | revoke <name|CODE>]
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$HERE/env.sh"
+exec node "$HERE/gate.cjs" "$@"

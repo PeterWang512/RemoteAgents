@@ -2,7 +2,7 @@
 # Start the CloudCLI web UI for Claude Code on a PRIVATE Unix socket (no TCP port).
 #
 # The socket lives in a 0700 directory on local disk, so other users on this
-# shared host cannot connect. Reach it from your laptop with laptop/tunnel.sh.
+# shared host cannot connect. The gate (gate.sh) is the only way in.
 # Usually launched by ./up.sh together with the voice server and the gate.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
